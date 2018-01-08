@@ -1,9 +1,9 @@
 require 'paypal-sdk-core'
 require 'securerandom'
 require 'multi_json'
-require 'open-uri'
 require 'zlib'
 require "base64"
+require 'net/http'
 
 module PayPal::SDK
   module REST
@@ -365,7 +365,7 @@ module PayPal::SDK
         raise_on_api_error :create, :update, :delete
       end
 
-      class Address < Base
+      class BaseAddress < Base
         def self.load_members
           object_of :line1, String
           object_of :line2, String
@@ -373,10 +373,21 @@ module PayPal::SDK
           object_of :country_code, String
           object_of :postal_code, String
           object_of :state, String
-          object_of :phone, String
           object_of :normalization_status, String
           object_of :status, String
           object_of :type, String
+        end
+      end
+
+      class Address < BaseAddress
+        def self.load_members
+          object_of :phone, String
+        end
+      end
+
+      class InvoiceAddress < BaseAddress
+        def self.load_members
+          object_of :phone, Phone
         end
       end
 
@@ -1519,8 +1530,8 @@ module PayPal::SDK
         class << self
 
           def get_cert(cert_url)
-            data = open(cert_url).read()
-            cert = OpenSSL::X509::Certificate.new data
+            data = Net::HTTP.get_response(URI.parse(cert_url))
+            cert = OpenSSL::X509::Certificate.new data.body
           end
 
           def get_cert_chain()
@@ -1811,11 +1822,37 @@ module PayPal::SDK
           object_of :first_name, String
           object_of :last_name, String
           object_of :business_name, String
-          object_of :address, Address
+          object_of :address, InvoiceAddress
           object_of :language, String
           object_of :additional_info, String
           object_of :notification_channel, String
           object_of :phone, Phone
+
+          define_method "address=" do |value|
+            if value.is_a?(Address)
+              value = value.to_hash
+            end
+            object = convert_object(value, InvoiceAddress)
+            instance_variable_set("@address", object)
+          end
+
+          define_method "address" do |&block|
+            default_value = PayPal::SDK::Core::Util::OrderedHash.new
+            value = instance_variable_get("@address") || ( default_value && (send("address=", default_value)))
+            value = convert_object(value.to_hash, Address)
+            value
+          end
+
+          define_method "invoice_address=" do |value|
+            object = convert_object(value, InvoiceAddress)
+            instance_variable_set("@address", object)
+          end
+
+          define_method "invoice_address" do |&block|
+            default_value = PayPal::SDK::Core::Util::OrderedHash.new
+            value = instance_variable_get("@address") || ( default_value && (send("address=", default_value)))
+            value
+          end
         end
       end
 
@@ -1824,8 +1861,34 @@ module PayPal::SDK
           object_of :first_name, String
           object_of :last_name, String
           object_of :business_name, String
-          object_of :address, Address
+          object_of :address, InvoiceAddress
           object_of :email, String
+
+          define_method "address=" do |value|
+            if value.is_a?(Address)
+              value = value.to_hash
+            end
+            object = convert_object(value, InvoiceAddress)
+            instance_variable_set("@address", object)
+          end
+
+          define_method "address" do |&block|
+            default_value = PayPal::SDK::Core::Util::OrderedHash.new
+            value = instance_variable_get("@address") || ( default_value && (send("address=", default_value)))
+            value = convert_object(value.to_hash, Address)
+            value
+          end
+
+          define_method "invoice_address=" do |value|
+            object = convert_object(value, InvoiceAddress)
+            instance_variable_set("@address", object)
+          end
+
+          define_method "invoice_address" do |&block|
+            default_value = PayPal::SDK::Core::Util::OrderedHash.new
+            value = instance_variable_get("@address") || ( default_value && (send("address=", default_value)))
+            value
+          end
         end
       end
 
@@ -2110,7 +2173,7 @@ module PayPal::SDK
           object_of :rel, String
           object_of :targetSchema, HyperSchema
           object_of :method, String
-          object_of :enctype, String
+          object_of :encType, String
           object_of :schema, HyperSchema
         end
       end
